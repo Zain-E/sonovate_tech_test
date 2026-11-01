@@ -1,3 +1,4 @@
+-- One row per version of a PSC (SCD2, maintained by dlt).
 select
     company_number,
     -- The last segment of the PSC's self link is its id.
@@ -28,5 +29,8 @@ select
     address ->> 'locality' as address_locality,
     address ->> 'region' as address_region,
     address ->> 'postal_code' as address_postal_code,
-    address ->> 'country' as address_country
+    address ->> 'country' as address_country,
+    _dlt_valid_from as valid_from,
+    _dlt_valid_to as valid_to,
+    _dlt_valid_to is null as is_current
 from {{ source('companies_house', 'persons_with_significant_control') }}

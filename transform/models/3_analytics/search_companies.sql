@@ -1,4 +1,5 @@
--- Every company each search term returned, with descriptive attributes. Grain: search term x company.
+-- Every company each search term returned in the latest run, with current attributes.
+-- Grain: search term x company.
 select
     results.search_term,
     results.search_rank,
@@ -19,3 +20,4 @@ from {{ ref('fct_company_search_results') }} as results
 inner join {{ ref('dim_company') }} as company using (company_number)
 left join {{ ref('dim_company_type') }} as type using (company_type)
 left join {{ ref('dim_company_status') }} as status using (company_status)
+where results.is_latest_snapshot

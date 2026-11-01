@@ -1,4 +1,4 @@
--- Headline figures per search term. Grain: search term.
+-- Headline figures per search term from the latest run. Grain: search term.
 with company_stats as (
     select
         search_term,
@@ -26,3 +26,4 @@ select
     searches.searched_at
 from {{ ref('fct_company_searches') }} as searches
 left join company_stats using (search_term)
+where searches.is_latest_snapshot

@@ -17,6 +17,15 @@ PSC_PATH = "/company/{company_number}/persons-with-significant-control"
 PAGE_SIZE = 100  # the API silently caps items_per_page at 100
 MAX_RESULTS = 1000  # the API errors once start_index goes beyond the first 1,000 results
 RATE_LIMIT_HEADROOM = 10  # requests to leave unused in each 5-minute window
+COMPANY_FIELDS = (
+    "company_number",
+    "title",
+    "company_status",
+    "company_type",
+    "date_of_creation",
+    "date_of_cessation",
+    "address",
+)
 
 
 def make_client(api_key: str, base_url: str = BASE_URL) -> RESTClient:
@@ -54,6 +63,12 @@ def search_companies(client: RESTClient, term: str) -> Iterator[dict]:
         yield {**item, "search_term": term, "search_rank": rank, "searched_at": searched_at}
 
 
+def company_attributes(result: dict) -> dict:
+    """A search result without what depends on the search (term, rank, highlighted matches), so a
+    company found by several terms, or unchanged since the last run, is the same SCD2 version."""
+    return {field: result.get(field) for field in COMPANY_FIELDS}
+
+
 def wait_for_rate_limit(response: Response, *args, **kwargs) -> None:
     """Sleep until the window resets once the API says the quota (600 / 5 min) is nearly spent."""
     remaining = response.headers.get("X-Ratelimit-Remain")
@@ -88,7 +103,12 @@ def companies_house(
 ):
     client = make_client(api_key, base_url)
 
-    @dlt.resource(write_disposition="replace")
+    # Every run is a full extract. Search snapshots are appended; companies and PSCs are SCD2, so
+    # dlt opens a new version when a record changes and closes the old one, or closes it when the
+    # record is no longer returned.
+    scd2 = {"disposition": "merge", "strategy": "scd2"}
+
+    @dlt.resource(write_disposition="append")
     def company_searches() -> Iterator[dict]:
         for term in search_terms:
             yield count_companies(client, term)
@@ -96,10 +116,23 @@ def companies_house(
     # Declared so the columns always exist (even with no dissolved companies) and land typed.
     date_columns = {c: {"data_type": "date"} for c in ("date_of_creation", "date_of_cessation")}
 
-    @dlt.resource(write_disposition="replace", columns=date_columns)
+    @dlt.resource(write_disposition="append", columns=date_columns)
     def company_search_results() -> Iterator[dict]:
         for term in search_terms:
             yield from search_companies(client, term)
+
+    seen_companies: set[str] = set()
+
+    @dlt.transformer(
+        data_from=company_search_results,
+        write_disposition=scd2,
+        columns={**date_columns, "address": {"data_type": "json"}},
+    )
+    def companies(result: dict) -> Iterator[dict]:
+        # One record per company per run, even when several search terms (or pages) return it.
+        if result["company_number"] not in seen_companies:
+            seen_companies.add(result["company_number"])
+            yield company_attributes(result)
 
     # Declared so staging can rely on them even when no PSC in the load has, say, identification.
     psc_columns = {
@@ -121,16 +154,9 @@ def companies_house(
             )
         },
     }
-    fetched_companies: set[str] = set()
 
-    @dlt.transformer(
-        data_from=company_search_results, write_disposition="replace", columns=psc_columns
-    )
-    def persons_with_significant_control(result: dict) -> Iterator[dict]:
-        # One request per company, even when several search terms (or pages) return it.
-        if result["company_number"] in fetched_companies:
-            return
-        fetched_companies.add(result["company_number"])
-        yield from list_persons_with_significant_control(client, result["company_number"])
+    @dlt.transformer(data_from=companies, write_disposition=scd2, columns=psc_columns)
+    def persons_with_significant_control(company: dict) -> Iterator[dict]:
+        yield from list_persons_with_significant_control(client, company["company_number"])
 
-    return company_searches, company_search_results, persons_with_significant_control
+    return company_searches, company_search_results, companies, persons_with_significant_control

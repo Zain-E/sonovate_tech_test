@@ -1,18 +1,25 @@
 models:
   - name: stg_companies_house__company_searches
-    description: One row per search term, with the API's own match count.
+    description: One row per search term per run, with the API's own match count.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "load_id || '|' || search_term"
     columns:
+      - name: load_id
+        description: dlt load id of the run. Identifies the snapshot.
+        data_tests: [not_null]
       - name: search_term
-        data_tests: [unique, not_null]
+        data_tests: [not_null]
       - name: total_results
         data_tests: [not_null]
 
   - name: stg_companies_house__company_search_results
-    description: Typed, flattened search results. Grain is search term x company.
+    description: Which companies each search returned. Grain is run x search term x company.
     data_tests:
       - unique:
           arguments:
-            column_name: "search_term || '|' || company_number"
+            column_name: "load_id || '|' || search_term || '|' || company_number"
     columns:
       - name: company_number
         data_tests: [not_null]
@@ -20,11 +27,29 @@ models:
         description: 1-based position in the API's relevance ranking.
         data_tests: [not_null]
 
+  - name: stg_companies_house__companies
+    description: Typed, flattened company versions. Grain is company x version.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "company_number || '|' || valid_from"
+    columns:
+      - name: company_number
+        data_tests: [not_null]
+      - name: valid_from
+        data_tests: [not_null]
+      - name: valid_to
+        description: NULL for the current version.
+
   - name: stg_companies_house__persons_with_significant_control
-    description: Typed, flattened persons with significant control. Grain is PSC.
+    description: Typed, flattened PSC versions. Grain is PSC x version.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "psc_id || '|' || valid_from"
     columns:
       - name: psc_id
         description: Last segment of the PSC's `links.self` URL.
-        data_tests: [unique, not_null]
+        data_tests: [not_null]
       - name: company_number
         data_tests: [not_null]

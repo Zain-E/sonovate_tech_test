@@ -1,13 +1,19 @@
 sources:
   - name: companies_house
-    description: Raw Companies House search API responses, loaded by dlt (ingestion/).
+    description: Raw Companies House API responses, loaded by dlt (ingestion/).
     schema: raw_companies_house
     tables:
       - name: company_searches
-        description: One row per search term per run, with the API's total match count.
+        description: Appended. One row per search term per run, with the API's total match count.
       - name: company_search_results
-        description: One row per search result (max 1,000 per term). Nested objects are JSON.
+        description: >
+          Appended. One row per search result per run (max 1,000 per term). Nested objects are JSON.
+      - name: companies
+        description: >
+          SCD2. One row per version of each company any search returned, with dlt's
+          _dlt_valid_from / _dlt_valid_to. A version closes when the company changes or stops
+          being returned.
       - name: persons_with_significant_control
         description: >
-          One row per PSC of each company returned by a search, from
+          SCD2. One row per version of each PSC of those companies, from
           /company/{company_number}/persons-with-significant-control. Nested objects are JSON.

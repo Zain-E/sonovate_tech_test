@@ -1,9 +1,12 @@
-"""Given a recorded API response, the whole pipeline (dlt -> dbt -> answers) gets the answers right.
+"""Given recorded API responses, the whole pipeline (dlt -> dbt -> answers) gets the answers right
+and keeps history across runs.
 
 Fixtures: tests/fixtures/search_companies_sono.json (7 synthetic companies) and
-psc_00000001.json (the PSCs of one of them; every other company has no PSC record).
+psc_00000001.json (the PSCs of one of them; every other company has no PSC record). The pipeline
+runs twice: first against an earlier state of the API (see `earlier`), then against the fixtures.
 """
 
+import copy
 import re
 from datetime import date
 from pathlib import Path
@@ -20,6 +23,31 @@ from reporting.answers import get_answers, render
 TRANSFORM_DIR = Path(__file__).parents[1] / "transform"
 
 
+def earlier(sono_fixture: dict, psc_fixture: dict) -> tuple[dict, dict]:
+    """The API before the fixtures' state: 00000002 was still active, SONO GONE LTD was still
+    returned, and the corporate PSC of 00000001 had not yet ceased."""
+    search, psc = copy.deepcopy(sono_fixture), copy.deepcopy(psc_fixture)
+    renovate = next(c for c in search["items"] if c["company_number"] == "00000002")
+    renovate["company_status"] = "active"
+    del renovate["date_of_cessation"]
+    gone = {"company_number": "00000099", "title": "SONO GONE LTD", "company_status": "active"}
+    search["items"].append({**gone, "company_type": "ltd", "date_of_creation": "2020-01-01"})
+    search["total_results"] += 1
+    corporate = psc["items"][1]
+    corporate["ceased"] = False
+    del corporate["ceased_on"]
+    return search, psc
+
+
+def load(api: requests_mock.Mocker, db: str, search: dict, psc: dict) -> None:
+    api.get(f"{BASE_URL}/search/companies", json=search)
+    api.get(
+        re.compile(rf"{BASE_URL}/company/\w+/persons-with-significant-control"), status_code=404
+    )
+    api.get(f"{BASE_URL}/company/00000001/persons-with-significant-control", json=psc)
+    pipeline.run(db, search_terms=["sono"], api_key="test-key")
+
+
 @pytest.fixture(scope="module")
 def warehouse(tmp_path_factory, sono_fixture, psc_fixture):
     tmp = tmp_path_factory.mktemp("warehouse")
@@ -28,13 +56,9 @@ def warehouse(tmp_path_factory, sono_fixture, psc_fixture):
     with pytest.MonkeyPatch.context() as env, requests_mock.Mocker() as api:
         env.setenv("DLT_DATA_DIR", str(tmp / "dlt"))
         env.setenv("DUCKDB_PATH", db)
-        api.get(f"{BASE_URL}/search/companies", json=sono_fixture)
-        api.get(
-            re.compile(rf"{BASE_URL}/company/\w+/persons-with-significant-control"), status_code=404
-        )
-        api.get(f"{BASE_URL}/company/00000001/persons-with-significant-control", json=psc_fixture)
 
-        pipeline.run(db, search_terms=["sono"], api_key="test-key")
+        load(api, db, *earlier(sono_fixture, psc_fixture))
+        load(api, db, sono_fixture, psc_fixture)
         dbt = dbtRunner().invoke(
             [
                 "build",
@@ -129,4 +153,49 @@ def test_dim_psc_flattens_each_person_with_significant_control(warehouse):
             False,
             None,
         ),
+    ]
+
+
+def test_answers_come_from_the_latest_run_only(warehouse):
+    runs = warehouse.sql(
+        "select total_results, is_latest_snapshot from warehouse.warehouse.fct_company_searches"
+        " order by loaded_at"
+    ).fetchall()
+
+    assert runs == [(8, False), (7, True)]
+
+
+def test_company_history_versions_changes_and_closes_companies_no_longer_returned(warehouse):
+    versions = warehouse.sql(
+        """
+        select company_number, company_status, valid_to is not null as is_closed, is_current
+        from warehouse.warehouse.dim_company_history
+        where company_number in ('00000001', '00000002', '00000099')
+        order by company_number, valid_from
+        """
+    ).fetchall()
+
+    assert versions == [
+        ("00000001", "active", False, True),  # unchanged: still its first version
+        ("00000002", "active", True, False),
+        ("00000002", "dissolved", False, True),
+        ("00000099", "active", True, False),  # no longer returned by the search
+    ]
+    current = warehouse.sql("select count(*) from warehouse.warehouse.dim_company").fetchone()
+    assert current == (7,)
+
+
+def test_psc_history_versions_a_psc_when_it_ceases(warehouse):
+    versions = warehouse.sql(
+        """
+        select psc_id, ceased_on, is_current
+        from warehouse.warehouse.dim_person_with_significant_control_history
+        order by psc_id, valid_from
+        """
+    ).fetchall()
+
+    assert versions == [
+        ("PSC-CORPORATE-1", None, False),
+        ("PSC-CORPORATE-1", date(2020, 1, 31), True),
+        ("PSC-INDIVIDUAL-1", None, True),
     ]

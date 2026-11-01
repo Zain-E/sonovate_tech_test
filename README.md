@@ -88,21 +88,35 @@ and run `make run && uv run python -m reporting.answers --term <term>`. No model
 
 ## Data model
 
-**`1_staging`** (views): one model per source table. It renames, casts, extracts the address from
-JSON, and dedupes results that offset pagination can repeat.
+**`raw_companies_house`** (loaded by dlt): every run is a full extract, but nothing is overwritten.
 
-**`2_warehouse`** (tables): a small Kimball star.
+| Table | Write disposition | Holds |
+|---|---|---|
+| `company_searches`, `company_search_results` | `append` | One snapshot per run, identified by dlt's `_dlt_load_id` |
+| `companies` | `merge` / `scd2` | One row per version of each company, with `_dlt_valid_from` / `_dlt_valid_to` |
+| `persons_with_significant_control` | `merge` / `scd2` | One row per version of each PSC |
+
+**`1_staging`** (views): one model per source table. It renames, casts, extracts the address from
+JSON, exposes the run as `load_id` / `loaded_at` and SCD2 validity as `valid_from` / `valid_to` /
+`is_current`, and dedupes results that offset pagination can repeat.
+
+**`2_warehouse`** (tables): a small Kimball star with history.
 
 | Model | Grain | Purpose |
 |---|---|---|
-| `dim_company` | company | Attributes plus derived `lifespan_days` and `premises_number`. Conformed across search terms. |
-| `dim_person_with_significant_control` | PSC | Current and ceased PSCs of each company in `dim_company` (name, kind, natures of control, notified/ceased dates). Not used by the answers. |
+| `dim_company` | company | Current version: attributes plus derived `lifespan_days` and `premises_number`. Conformed across search terms. |
+| `dim_company_history` | company × version | Every version (SCD2), e.g. when a company went from active to dissolved |
+| `dim_person_with_significant_control` | PSC | Current version of the current and ceased PSCs of each company in `dim_company`. Not used by the answers. |
+| `dim_person_with_significant_control_history` | PSC × version | Every version (SCD2) |
 | `dim_company_type` / `dim_company_status` | enum value | Descriptions seeded from [`companieshouse/api-enumerations`](https://github.com/companieshouse/api-enumerations) |
-| `fct_company_search_results` | search term × company | Factless fact: which companies a search returned, and at what rank |
-| `fct_company_searches` | search term | API `total_results` vs. results fetched, with an `is_truncated` flag |
+| `fct_company_search_results` | run × search term × company | Factless fact: which companies a search returned, and at what rank |
+| `fct_company_searches` | run × search term | API `total_results` vs. results fetched, with an `is_truncated` flag |
+
+Both facts carry `is_latest_snapshot`, true for the most recent run.
 
 **`3_analytics`** (tables): denormalised, question-shaped marts that the answers script and the
-dashboard read. They don't contain any logic the warehouse doesn't already have.
+dashboard read. They use the latest run and current versions only, and don't contain any logic the
+warehouse doesn't already have.
 
 ## Design decisions and assumptions
 
@@ -122,8 +136,13 @@ dashboard read. They don't contain any logic the warehouse doesn't already have.
 - **Parquet.** The data is small (≤1,000 rows per term), so Parquet isn't needed for volume. It is
   used because it carries types end to end: dates land as `DATE`, not strings. Nested objects
   (`address`, `links`, `matches`) land as JSON columns, so new API fields can't break the raw schema.
-- **Full refresh** (`write_disposition="replace"`). Search results are a point-in-time snapshot and
-  re-fetching is cheap, so incremental logic would add complexity for no benefit at this size.
+- **Full extract, history kept.** The search API has no "changed since" filter, so every run
+  fetches everything again. Searches are appended as snapshots, and companies and PSCs are SCD2:
+  dlt hashes each record, opens a new version when the hash changes, and closes the open version of
+  any record the run no longer returns (e.g. a company that dropped out of the top 1,000 or whose
+  search term was removed). Companies are versioned on their attributes only (`COMPANY_FIELDS`),
+  not on the term or rank they were found by, so ranking changes don't create versions. History
+  starts from the first run: the API only returns current state, so the past can't be backfilled.
 - **Persons with significant control** are fetched by a dlt transformer, one request per company
   that any search returned. That is roughly one request per result, which exceeds the API's
   600-requests-per-5-minutes limit for a full 1,000-result term. The client reads the
@@ -180,8 +199,10 @@ rewrite:
    on the project, restricted to this repository via the provider's attribute condition.
 4. **Separate environments**: dev and prod datasets via dbt targets, with `--target prod` only from
    `main`.
-5. **History**: switch `dim_company` to SCD2 (dlt's `merge` + `scd2` strategy, or a dbt snapshot) and
-   append search results with a snapshot date, so you can see how a company's status changes over time.
+5. **Persistent history**: the scheduled workflow starts from an empty DuckDB file, so snapshots
+   and SCD2 versions only build up where the file persists (locally). A cloud warehouse (item 1)
+   keeps them between runs. For true CDC, the Companies House Streaming API pushes company and
+   PSC change events with a resumable `timepoint`.
 6. **Observability**: source freshness on `searched_at`, dlt load info shipped to a monitoring
    table, and alerts on test failures.
 7. **Enrichment**: the `/company/{number}` profile endpoint (SIC codes, accounts, officers) as

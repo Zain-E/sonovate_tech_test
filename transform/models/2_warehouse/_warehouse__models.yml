@@ -1,6 +1,26 @@
 models:
+  - name: dim_company_history
+    description: >
+      Every version of every company returned by any search (SCD2). A new version starts when any
+      attribute changes; the open version closes when the company changes or stops being returned.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "company_number || '|' || valid_from"
+    columns:
+      - name: company_number
+        data_tests: [not_null]
+      - name: valid_from
+        description: Start of the run that first saw this version.
+      - name: valid_to
+        description: Start of the run that replaced or stopped seeing this version. NULL while current.
+      - name: lifespan_days
+        description: Days from incorporation to cessation. NULL while the company exists.
+      - name: premises_number
+        description: All digits in the address premises joined into one number ('6-8' -> 68).
+
   - name: dim_company
-    description: One row per company returned by any search.
+    description: One row per company, its current version. Feeds the analytics layer.
     columns:
       - name: company_number
         data_tests: [unique, not_null]
@@ -14,15 +34,29 @@ models:
           - relationships:
               arguments: {to: ref('dim_company_status'), field: company_status}
               config: {severity: warn}
-      - name: lifespan_days
-        description: Days from incorporation to cessation. NULL while the company exists.
-      - name: premises_number
-        description: All digits in the address premises joined into one number ('6-8' -> 68).
+      - name: valid_from
+        description: When this version of the company was first seen.
+
+  - name: dim_person_with_significant_control_history
+    description: >
+      Every version of every person with significant control (PSC) of a searched company (SCD2).
+      Companies with no PSC record (e.g. dissolved before the 2016 register) have no rows.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "psc_id || '|' || valid_from"
+    columns:
+      - name: psc_id
+        data_tests: [not_null]
+      - name: company_number
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_company_history'), field: company_number}
 
   - name: dim_person_with_significant_control
     description: >
-      One row per person with significant control (PSC) of a company in dim_company, current or
-      ceased. Companies with no PSC record (e.g. dissolved before the 2016 register) have no rows.
+      One row per PSC of a company in dim_company, its current version. Includes PSCs that have
+      ceased to have control (is_ceased), which the register still lists.
     columns:
       - name: psc_id
         data_tests: [unique, not_null]
@@ -66,34 +100,46 @@ models:
         data_tests: [unique, not_null]
 
   - name: fct_company_search_results
-    description: Factless fact linking each search term to the companies it returned.
+    description: >
+      Factless fact linking each search term to the companies it returned, per run. Filter on
+      is_latest_snapshot for the current results.
     data_tests:
       - unique:
           arguments:
-            column_name: "search_term || '|' || company_number"
+            column_name: "load_id || '|' || search_term || '|' || company_number"
     columns:
       - name: company_number
         data_tests:
           - relationships:
-              arguments: {to: ref('dim_company'), field: company_number}
+              arguments: {to: ref('dim_company_history'), field: company_number}
       - name: search_term
         data_tests:
           - relationships:
               arguments: {to: ref('fct_company_searches'), field: search_term}
+      - name: is_latest_snapshot
+        description: True for rows from the most recent pipeline run.
 
   - name: fct_company_searches
-    description: One row per search term with the API's total and how many results were fetched.
+    description: >
+      One row per search term per run with the API's total and how many results were fetched.
+      Filter on is_latest_snapshot for the current figures.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "load_id || '|' || search_term"
     columns:
       - name: search_term
-        data_tests: [unique, not_null]
+        data_tests: [not_null]
       - name: is_truncated
         description: True when the API reports more matches than its 1,000-result cap lets us fetch.
+      - name: is_latest_snapshot
+        description: True for rows from the most recent pipeline run.
 
 unit_tests:
-  - name: dim_company_derives_premises_number_and_lifespan
-    model: dim_company
+  - name: dim_company_history_derives_premises_number_and_lifespan
+    model: dim_company_history
     given:
-      - input: ref('stg_companies_house__company_search_results')
+      - input: ref('stg_companies_house__companies')
         rows:
           - {company_number: "1", address_premises: "6-8", incorporated_on: 2010-01-01, ceased_on: 2012-01-01}
           - {company_number: "2", address_premises: "14b", incorporated_on: 2015-06-01, ceased_on: 2016-06-01}
@@ -108,13 +154,31 @@ unit_tests:
         - {company_number: "4", premises_number: null, lifespan_days: null}
         - {company_number: "5", premises_number: null, lifespan_days: null}
 
-  - name: dim_company_keeps_latest_attributes_when_found_by_several_terms
+  - name: dim_company_keeps_only_the_current_version
     model: dim_company
     given:
-      - input: ref('stg_companies_house__company_search_results')
+      - input: ref('dim_company_history')
         rows:
-          - {company_number: "1", search_term: a, company_status: active, searched_at: "2026-01-01 00:00:00+00"}
-          - {company_number: "1", search_term: b, company_status: dissolved, searched_at: "2026-02-01 00:00:00+00"}
+          - {company_number: "1", company_status: active, valid_from: "2026-01-01 00:00:00+00", valid_to: "2026-02-01 00:00:00+00", is_current: false}
+          - {company_number: "1", company_status: dissolved, valid_from: "2026-02-01 00:00:00+00", valid_to: null, is_current: true}
+          - {company_number: "2", company_status: active, valid_from: "2026-01-01 00:00:00+00", valid_to: "2026-02-01 00:00:00+00", is_current: false}
     expect:
       rows:
         - {company_number: "1", company_status: dissolved}
+
+  - name: fct_company_searches_flags_only_the_latest_run
+    model: fct_company_searches
+    given:
+      - input: ref('stg_companies_house__company_searches')
+        rows:
+          - {load_id: "1", loaded_at: "2026-01-01 00:00:00+00", search_term: sono, total_results: 2}
+          - {load_id: "2", loaded_at: "2026-02-01 00:00:00+00", search_term: sono, total_results: 1}
+      - input: ref('stg_companies_house__company_search_results')
+        rows:
+          - {load_id: "1", search_term: sono, company_number: "1"}
+          - {load_id: "1", search_term: sono, company_number: "2"}
+          - {load_id: "2", search_term: sono, company_number: "1"}
+    expect:
+      rows:
+        - {load_id: "1", results_fetched: 2, is_latest_snapshot: false}
+        - {load_id: "2", results_fetched: 1, is_latest_snapshot: true}

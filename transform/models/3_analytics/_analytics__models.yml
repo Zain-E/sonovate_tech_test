@@ -35,8 +35,9 @@ unit_tests:
     given:
       - input: ref('fct_company_searches')
         rows:
-          - {search_term: sono, total_results: 5, results_fetched: 5, is_truncated: false}
-          - {search_term: nothing, total_results: 0, results_fetched: 0, is_truncated: false}
+          - {search_term: sono, total_results: 5, results_fetched: 5, is_truncated: false, is_latest_snapshot: true}
+          - {search_term: sono, total_results: 9, results_fetched: 9, is_truncated: false, is_latest_snapshot: false}
+          - {search_term: nothing, total_results: 0, results_fetched: 0, is_truncated: false, is_latest_snapshot: true}
       - input: ref('search_companies')
         rows:
           - {search_term: sono, company_name: A, company_status: active, company_type: ltd}
