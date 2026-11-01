@@ -1,0 +1,19 @@
+name: sonovate
+version: "1.0.0"
+profile: sonovate
+
+models:
+  sonovate:
+    1_staging:
+      +schema: staging
+      +materialized: view
+    2_warehouse:
+      +schema: warehouse
+      +materialized: table
+    3_analytics:
+      +schema: analytics
+      +materialized: table
+
+seeds:
+  sonovate:
+    +schema: reference

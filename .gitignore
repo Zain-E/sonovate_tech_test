@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+data/
+.dlt/secrets.toml
+transform/target/
+transform/logs/
+transform/dbt_packages/
+transform/.user.yml
+.DS_Store

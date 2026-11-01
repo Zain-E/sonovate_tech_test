@@ -1,0 +1,52 @@
+models:
+  - name: search_companies
+    description: Every company each search term returned, with descriptions. Grain is search term x company.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "search_term || '|' || company_number"
+
+  - name: search_summary
+    description: Headline figures per search term (answers Q1 to Q4).
+    columns:
+      - name: search_term
+        data_tests: [unique, not_null]
+      - name: total_results
+        description: Q1. The API's own count of companies matching the term.
+      - name: results_fetched
+        description: How many of those the API let us fetch (capped at 1,000). Q2 to Q6 cover this set.
+      - name: active_companies
+        description: Q2.
+      - name: avg_dissolved_lifespan_days
+        description: Q3. Mean days from incorporation to cessation for dissolved companies.
+      - name: first_limited_partnership_incorporated_on
+        description: Q4.
+
+  - name: search_premises_by_company_type
+    description: Q6. Sum of premises numbers per company type. Grain is search term x company type.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "search_term || '|' || company_type"
+
+unit_tests:
+  - name: search_summary_answers
+    model: search_summary
+    given:
+      - input: ref('fct_company_searches')
+        rows:
+          - {search_term: sono, total_results: 5, results_fetched: 5, is_truncated: false}
+          - {search_term: nothing, total_results: 0, results_fetched: 0, is_truncated: false}
+      - input: ref('search_companies')
+        rows:
+          - {search_term: sono, company_name: A, company_status: active, company_type: ltd}
+          - {search_term: sono, company_name: B, company_status: dissolved, company_type: ltd, lifespan_days: 100}
+          - {search_term: sono, company_name: C, company_status: dissolved, company_type: limited-partnership, lifespan_days: 200, incorporated_on: 2001-01-01}
+          - {search_term: sono, company_name: D, company_status: active, company_type: limited-partnership, incorporated_on: 1999-05-05}
+          - {search_term: sono, company_name: E, company_status: liquidation, company_type: llp}
+    expect:
+      rows:
+        - {search_term: sono, active_companies: 2, dissolved_companies: 2, avg_dissolved_lifespan_days: 150,
+           first_limited_partnership_incorporated_on: 1999-05-05, first_limited_partnership_name: D}
+        - {search_term: nothing, active_companies: 0, dissolved_companies: 0, avg_dissolved_lifespan_days: null,
+           first_limited_partnership_incorporated_on: null, first_limited_partnership_name: null}

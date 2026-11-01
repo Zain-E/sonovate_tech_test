@@ -1,0 +1,9 @@
+# Search terms to ingest. Add terms here; nothing downstream needs to change.
+[sources.companies_house]
+search_terms = ["sono"]
+
+[runtime]
+log_level = "WARNING"
+dlthub_telemetry = false
+# Companies House allows 600 requests / 5 minutes; dlt retries 429s and 5xx with backoff.
+request_max_attempts = 5

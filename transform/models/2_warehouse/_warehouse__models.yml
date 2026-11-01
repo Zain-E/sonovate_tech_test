@@ -1,0 +1,120 @@
+models:
+  - name: dim_company
+    description: One row per company returned by any search.
+    columns:
+      - name: company_number
+        data_tests: [unique, not_null]
+      - name: company_type
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_company_type'), field: company_type}
+              config: {severity: warn}  # a new CH enum value should alert, not block
+      - name: company_status
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_company_status'), field: company_status}
+              config: {severity: warn}
+      - name: lifespan_days
+        description: Days from incorporation to cessation. NULL while the company exists.
+      - name: premises_number
+        description: All digits in the address premises joined into one number ('6-8' -> 68).
+
+  - name: dim_person_with_significant_control
+    description: >
+      One row per person with significant control (PSC) of a company in dim_company, current or
+      ceased. Companies with no PSC record (e.g. dissolved before the 2016 register) have no rows.
+    columns:
+      - name: psc_id
+        data_tests: [unique, not_null]
+      - name: company_number
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_company'), field: company_number}
+      - name: psc_kind
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - individual-person-with-significant-control
+                  - corporate-entity-person-with-significant-control
+                  - legal-person-with-significant-control
+                  - legal-person-person-with-significant-control  # what the API actually returns
+                  - super-secure-person-with-significant-control
+                  - individual-beneficial-owner
+                  - corporate-entity-beneficial-owner
+                  - legal-person-beneficial-owner
+                  - super-secure-beneficial-owner
+              config: {severity: warn}
+      - name: natures_of_control
+        description: List of Companies House nature-of-control codes, e.g. ownership-of-shares-25-to-50-percent.
+      - name: birth_year
+        description: The API publishes only month and year of birth.
+      - name: is_ceased
+        description: True once the PSC no longer has significant control (ceased_on is set).
+
+  - name: dim_company_type
+    description: Companies House company type enumeration (seeded from companieshouse/api-enumerations).
+    columns:
+      - name: company_type
+        data_tests: [unique, not_null]
+
+  - name: dim_company_status
+    description: Companies House company status enumeration (seeded from companieshouse/api-enumerations).
+    columns:
+      - name: company_status
+        data_tests: [unique, not_null]
+
+  - name: fct_company_search_results
+    description: Factless fact linking each search term to the companies it returned.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "search_term || '|' || company_number"
+    columns:
+      - name: company_number
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_company'), field: company_number}
+      - name: search_term
+        data_tests:
+          - relationships:
+              arguments: {to: ref('fct_company_searches'), field: search_term}
+
+  - name: fct_company_searches
+    description: One row per search term with the API's total and how many results were fetched.
+    columns:
+      - name: search_term
+        data_tests: [unique, not_null]
+      - name: is_truncated
+        description: True when the API reports more matches than its 1,000-result cap lets us fetch.
+
+unit_tests:
+  - name: dim_company_derives_premises_number_and_lifespan
+    model: dim_company
+    given:
+      - input: ref('stg_companies_house__company_search_results')
+        rows:
+          - {company_number: "1", address_premises: "6-8", incorporated_on: 2010-01-01, ceased_on: 2012-01-01}
+          - {company_number: "2", address_premises: "14b", incorporated_on: 2015-06-01, ceased_on: 2016-06-01}
+          - {company_number: "3", address_premises: "1st Floor 45 Main St", incorporated_on: 2020-01-01}
+          - {company_number: "4", address_premises: "The Old Mill"}
+          - {company_number: "5", address_premises: null}
+    expect:
+      rows:
+        - {company_number: "1", premises_number: 68, lifespan_days: 730}
+        - {company_number: "2", premises_number: 14, lifespan_days: 366}
+        - {company_number: "3", premises_number: 145, lifespan_days: null}
+        - {company_number: "4", premises_number: null, lifespan_days: null}
+        - {company_number: "5", premises_number: null, lifespan_days: null}
+
+  - name: dim_company_keeps_latest_attributes_when_found_by_several_terms
+    model: dim_company
+    given:
+      - input: ref('stg_companies_house__company_search_results')
+        rows:
+          - {company_number: "1", search_term: a, company_status: active, searched_at: "2026-01-01 00:00:00+00"}
+          - {company_number: "1", search_term: b, company_status: dissolved, searched_at: "2026-02-01 00:00:00+00"}
+    expect:
+      rows:
+        - {company_number: "1", company_status: dissolved}

@@ -1,0 +1,231 @@
+{
+  "kind": "search#companies",
+  "items_per_page": 100,
+  "page_number": 1,
+  "start_index": 0,
+  "total_results": 7,
+  "items": [
+    {
+      "kind": "searchresults#company",
+      "title": "SONOVATECH LIMITED",
+      "company_number": "00000001",
+      "company_status": "active",
+      "company_type": "ltd",
+      "date_of_creation": "2013-02-15",
+      "address": {
+        "address_line_1": "Market Street",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England",
+        "premises": "6-8"
+      },
+      "address_snippet": "6-8, Market Street, London, EC1A 1AA",
+      "description": "00000001 - Incorporated on 2013-02-15",
+      "description_identifier": [
+        "incorporated-on"
+      ],
+      "links": {
+        "self": "/company/00000001"
+      },
+      "matches": {
+        "title": [
+          1,
+          4
+        ],
+        "snippet": []
+      },
+      "snippet": ""
+    },
+    {
+      "kind": "searchresults#company",
+      "title": "SONO RENOVATE LTD",
+      "company_number": "00000002",
+      "company_status": "dissolved",
+      "company_type": "ltd",
+      "date_of_creation": "2010-01-01",
+      "address": {
+        "address_line_1": "High Road",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England",
+        "premises": "14b"
+      },
+      "address_snippet": "14b, High Road, London, EC1A 1AA",
+      "description": "00000002 - Incorporated on 2010-01-01",
+      "description_identifier": [
+        "incorporated-on",
+        "dissolved-on"
+      ],
+      "links": {
+        "self": "/company/00000002"
+      },
+      "matches": {
+        "title": [
+          1,
+          4
+        ],
+        "snippet": []
+      },
+      "snippet": "",
+      "date_of_cessation": "2012-01-01"
+    },
+    {
+      "kind": "searchresults#company",
+      "title": "SONOMA TRADING LTD",
+      "company_number": "00000003",
+      "company_status": "dissolved",
+      "company_type": "ltd",
+      "date_of_creation": "2015-06-01",
+      "address": {
+        "address_line_1": "Main Street",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England",
+        "premises": "1st Floor 45 Main St"
+      },
+      "address_snippet": "1st Floor 45 Main St, Main Street, London, EC1A 1AA",
+      "description": "00000003 - Incorporated on 2015-06-01",
+      "description_identifier": [
+        "incorporated-on",
+        "dissolved-on"
+      ],
+      "links": {
+        "self": "/company/00000003"
+      },
+      "matches": {
+        "title": [
+          1,
+          4
+        ],
+        "snippet": []
+      },
+      "snippet": "",
+      "date_of_cessation": "2016-06-01"
+    },
+    {
+      "kind": "searchresults#company",
+      "title": "SONORA PARTNERS LP",
+      "company_number": "LP000004",
+      "company_status": "active",
+      "company_type": "limited-partnership",
+      "date_of_creation": "2001-03-10",
+      "address": {
+        "address_line_1": "Mill Lane",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England",
+        "premises": "Unit 2"
+      },
+      "address_snippet": "Unit 2, Mill Lane, London, EC1A 1AA",
+      "description": "LP000004 - Incorporated on 2001-03-10",
+      "description_identifier": [
+        "incorporated-on"
+      ],
+      "links": {
+        "self": "/company/LP000004"
+      },
+      "matches": {
+        "title": [
+          1,
+          4
+        ],
+        "snippet": []
+      },
+      "snippet": ""
+    },
+    {
+      "kind": "searchresults#company",
+      "title": "SONO HOLDINGS LP",
+      "company_number": "LP000005",
+      "company_status": "dissolved",
+      "company_type": "limited-partnership",
+      "date_of_creation": "1998-07-20",
+      "address": {
+        "address_line_1": "Church Road",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England"
+      },
+      "address_snippet": "Church Road, London, EC1A 1AA",
+      "description": "LP000005 - Incorporated on 1998-07-20",
+      "description_identifier": [
+        "incorporated-on",
+        "dissolved-on"
+      ],
+      "links": {
+        "self": "/company/LP000005"
+      },
+      "matches": {
+        "title": [
+          1,
+          4
+        ],
+        "snippet": []
+      },
+      "snippet": "",
+      "date_of_cessation": "2005-07-20"
+    },
+    {
+      "kind": "searchresults#company",
+      "title": "SONOS VENTURES LLP",
+      "company_number": "OC000006",
+      "company_status": "liquidation",
+      "company_type": "llp",
+      "date_of_creation": "2018-09-09",
+      "address": {
+        "address_line_1": "Station Road",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England",
+        "premises": "The Old Mill"
+      },
+      "address_snippet": "The Old Mill, Station Road, London, EC1A 1AA",
+      "description": "OC000006 - Incorporated on 2018-09-09",
+      "description_identifier": [
+        "incorporated-on"
+      ],
+      "links": {
+        "self": "/company/OC000006"
+      },
+      "matches": {
+        "title": [
+          1,
+          4
+        ],
+        "snippet": []
+      },
+      "snippet": ""
+    },
+    {
+      "kind": "searchresults#company",
+      "title": "SONIC BOOM LTD",
+      "company_number": "00000007",
+      "company_status": "active",
+      "company_type": "ltd",
+      "date_of_creation": "2020-01-01",
+      "address": {
+        "address_line_1": "Park Avenue",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England",
+        "premises": "100"
+      },
+      "address_snippet": "100, Park Avenue, London, EC1A 1AA",
+      "description": "00000007 - Incorporated on 2020-01-01",
+      "description_identifier": [
+        "incorporated-on"
+      ],
+      "links": {
+        "self": "/company/00000007"
+      },
+      "matches": {
+        "title": [
+          1,
+          4
+        ],
+        "snippet": []
+      },
+      "snippet": ""
+    }
+  ]
+}

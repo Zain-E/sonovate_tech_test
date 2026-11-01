@@ -1,0 +1,13 @@
+company_status,description
+active,Active
+administration,In Administration
+closed,Closed
+converted-closed,Converted / Closed
+dissolved,Dissolved
+insolvency-proceedings,Insolvency Proceedings
+liquidation,Liquidation
+open,Open
+receivership,Receiver Action
+registered,Registered
+removed,Removed
+voluntary-arrangement,Voluntary Arrangement

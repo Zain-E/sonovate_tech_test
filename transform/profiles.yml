@@ -1,0 +1,7 @@
+sonovate:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', 'data/warehouse.duckdb') }}"  # relative to repo root
+      threads: 4

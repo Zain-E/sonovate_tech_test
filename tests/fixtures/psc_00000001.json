@@ -1,0 +1,51 @@
+{
+  "items_per_page": 100,
+  "start_index": 0,
+  "total_results": 2,
+  "active_count": 1,
+  "ceased_count": 1,
+  "links": {"self": "/company/00000001/persons-with-significant-control"},
+  "items": [
+    {
+      "etag": "etag-1",
+      "kind": "individual-person-with-significant-control",
+      "name": "Ms Jane Example",
+      "name_elements": {"title": "Ms", "forename": "Jane", "surname": "Example"},
+      "nationality": "British",
+      "country_of_residence": "England",
+      "date_of_birth": {"month": 9, "year": 1975},
+      "notified_on": "2016-04-06",
+      "ceased": false,
+      "natures_of_control": [
+        "ownership-of-shares-75-to-100-percent",
+        "voting-rights-75-to-100-percent"
+      ],
+      "address": {
+        "premises": "6-8",
+        "address_line_1": "Market Street",
+        "locality": "London",
+        "postal_code": "EC1A 1AA",
+        "country": "England"
+      },
+      "links": {"self": "/company/00000001/persons-with-significant-control/individual/PSC-INDIVIDUAL-1"}
+    },
+    {
+      "etag": "etag-2",
+      "kind": "corporate-entity-person-with-significant-control",
+      "name": "Example Holdings Limited",
+      "notified_on": "2016-04-06",
+      "ceased_on": "2020-01-31",
+      "ceased": true,
+      "natures_of_control": ["ownership-of-shares-25-to-50-percent"],
+      "identification": {
+        "legal_form": "Private Limited Company",
+        "legal_authority": "Companies Act 2006",
+        "registration_number": "99999999",
+        "place_registered": "Companies House",
+        "country_registered": "England"
+      },
+      "address": {"premises": "1", "address_line_1": "High Street", "locality": "Leeds"},
+      "links": {"self": "/company/00000001/persons-with-significant-control/corporate-entity/PSC-CORPORATE-1"}
+    }
+  ]
+}

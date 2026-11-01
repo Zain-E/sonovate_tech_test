@@ -1,0 +1,9 @@
+seeds:
+  - name: company_types
+    description: >
+      company_type values from
+      https://github.com/companieshouse/api-enumerations/blob/master/constants.yml
+  - name: company_statuses
+    description: >
+      company_status values from
+      https://github.com/companieshouse/api-enumerations/blob/master/constants.yml

@@ -1,0 +1,31 @@
+name: Pipeline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+
+concurrency: pipeline
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCES__COMPANIES_HOUSE__API_KEY: ${{ secrets.COMPANIES_HOUSE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: make run
+      - name: Publish answers to the run summary
+        run: cat ANSWERS.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: warehouse-${{ github.run_id }}
+          path: |
+            ANSWERS.md
+            data/warehouse.duckdb
+          retention-days: 30

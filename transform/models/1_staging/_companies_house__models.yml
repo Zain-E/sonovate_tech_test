@@ -1,0 +1,30 @@
+models:
+  - name: stg_companies_house__company_searches
+    description: One row per search term, with the API's own match count.
+    columns:
+      - name: search_term
+        data_tests: [unique, not_null]
+      - name: total_results
+        data_tests: [not_null]
+
+  - name: stg_companies_house__company_search_results
+    description: Typed, flattened search results. Grain is search term x company.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "search_term || '|' || company_number"
+    columns:
+      - name: company_number
+        data_tests: [not_null]
+      - name: search_rank
+        description: 1-based position in the API's relevance ranking.
+        data_tests: [not_null]
+
+  - name: stg_companies_house__persons_with_significant_control
+    description: Typed, flattened persons with significant control. Grain is PSC.
+    columns:
+      - name: psc_id
+        description: Last segment of the PSC's `links.self` URL.
+        data_tests: [unique, not_null]
+      - name: company_number
+        data_tests: [not_null]
