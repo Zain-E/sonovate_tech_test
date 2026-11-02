@@ -1,9 +1,11 @@
 # Companies House search warehouse
 
-A small, production-shaped data platform that answers the Sonovate tech-test questions about the
+A small data platform that answers the Sonovate tech-test questions about the
 Companies House API. It is built as a reusable warehouse rather than a one-off script: search terms
 are configuration, the questions are answered by the analytics layer, and a Streamlit dashboard
 presents the answers.
+
+In a production reality, I would not use duckdb, but something like BigQuery - however for reproducibility in other local environments without having to share env variables, I have used duckdb as the primary database.
 
 ```mermaid
 flowchart LR
@@ -133,17 +135,13 @@ grouped by schema: `raw_companies_house` (as loaded by dlt), `staging`, `warehou
 
 ## Production path
 
-DuckDB keeps this runnable on a laptop. In production I would point the same code at a cloud
+In production I would point the same code at a cloud
 warehouse such as **BigQuery** (or Snowflake). dlt and dbt make that a configuration change, not a
 rewrite:
 
 1. **Destination**: `dlt.destinations.bigquery()` in place of `duckdb`. Parquet load files go
    straight into BigQuery load jobs.
-2. **dbt**: add a `bigquery` target to `profiles.yml` with `dbt-bigquery`. Most of the SQL ports
-   as-is. The few dialect-specific bits are JSON `->>` (`JSON_VALUE`), `count(*) filter (…)`
-   (`COUNTIF`), `arg_min` (`MIN_BY`), `date_diff` and the regex flag. Each sits behind
-   `{{ dbt.datediff() }}` or a small `adapter.dispatch` macro, like the existing `digits_to_number`.
-3. **Auth from GitHub Actions** with Workload Identity Federation, so no long-lived service-account keys:
+2. **Auth from GitHub Actions** with Workload Identity Federation, so no long-lived service-account keys:
 
    ```yaml
    permissions: { contents: read, id-token: write }
@@ -156,14 +154,12 @@ rewrite:
 
    Grant the service account `roles/bigquery.dataEditor` on the datasets and `roles/bigquery.jobUser`
    on the project, restricted to this repository via the provider's attribute condition.
-4. **Separate environments**: dev and prod datasets via dbt targets, with `--target prod` only from
+3. **Separate environments**: dev and prod datasets via dbt targets, with `--target prod` only from
    `main`.
-5. **Persistent history**: the scheduled workflow starts from an empty DuckDB file, so snapshots
+4. **Persistent history**: the scheduled workflow starts from an empty DuckDB file, so snapshots
    and SCD2 versions only build up where the file persists (locally). A cloud warehouse (item 1)
    keeps them between runs. For true CDC, the Companies House Streaming API pushes company and
    PSC change events with a resumable `timepoint`.
-6. **Observability**: source freshness on `searched_at`, dlt load info shipped to a monitoring
-   table, and alerts on test failures.
-7. **Enrichment**: the `/company/{number}` profile endpoint (SIC codes, accounts, officers) as
+5. **Enrichment**: the `/company/{number}` profile endpoint (SIC codes, accounts, officers) as
    further dlt transformers, following the incremental PSC one. Spreading each company's refresh
    across the window (rather than all expiring on the same day) would even out the rate-limit load.
