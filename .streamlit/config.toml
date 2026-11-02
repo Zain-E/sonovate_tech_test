@@ -1,0 +1,22 @@
+# Sonovate brand palette (from sonovate.com's theme.css). DM Sans is their web fallback for
+# GT Walsheim Pro, which is a licensed font.
+[theme]
+base = "light"
+primaryColor = "#7C07FC"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F3F9"
+textColor = "#180028"
+linkColor = "#7C07FC"
+borderColor = "#D8CCE0"
+baseRadius = "0.75rem"
+font = "DM Sans:https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap"
+chartCategoricalColors = ["#3D0066", "#01E1FD", "#7C07FC", "#B26BFC", "#02DDC1", "#FF4289"]
+
+[theme.sidebar]
+backgroundColor = "#3D0066"
+secondaryBackgroundColor = "#24003D"
+textColor = "#FFFFFF"
+borderColor = "#3D0066"
+
+[client]
+toolbarMode = "minimal"

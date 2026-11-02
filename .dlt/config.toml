@@ -1,6 +1,9 @@
 # Search terms to ingest. Add terms here; nothing downstream needs to change.
 [sources.companies_house]
 search_terms = ["sono"]
+# Re-fetch a company's PSCs at least this often even if its attributes haven't changed.
+# 0 re-fetches every company every run (a full PSC refresh).
+psc_refresh_days = 7
 
 [runtime]
 log_level = "WARNING"

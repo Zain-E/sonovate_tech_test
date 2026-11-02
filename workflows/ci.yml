@@ -16,5 +16,5 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: make lint
-      # Unit tests + end-to-end (recorded API response -> dlt -> dbt build -> answers). No secrets needed.
+      # Unit tests + end-to-end (recorded API response -> dlt -> dbt build -> analytics). No secrets needed.
       - run: make test

@@ -4,21 +4,18 @@ export
 DBT = uv run dbt --no-use-colors
 DBT_ARGS = --project-dir transform --profiles-dir transform
 
-.PHONY: install run ingest transform answers app test lint format docs
+.PHONY: install run ingest transform app test lint format docs
 
 install:            ## install dependencies
 	uv sync
 
-run: ingest transform answers  ## full pipeline: API -> DuckDB -> dbt -> ANSWERS.md
+run: ingest transform  ## full pipeline: API -> DuckDB -> dbt
 
 ingest:             ## load Companies House search results into raw_companies_house
 	uv run python -m ingestion.pipeline
 
 transform:          ## build + test all dbt models (staging -> warehouse -> analytics)
 	$(DBT) build $(DBT_ARGS)
-
-answers:            ## write ANSWERS.md from the analytics layer
-	uv run python -m reporting.answers
 
 app:                ## launch the Streamlit dashboard
 	uv run streamlit run app/streamlit_app.py

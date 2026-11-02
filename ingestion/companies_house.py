@@ -1,8 +1,10 @@
 """dlt source for the Companies House public data API (company search + PSCs)."""
 
+import hashlib
+import json
 import time
 from collections.abc import Iterator, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import dlt
 from dlt.sources.helpers.rest_client import RESTClient
@@ -87,12 +89,33 @@ def skip_not_found(response: Response, *args, **kwargs) -> None:
 def list_persons_with_significant_control(
     client: RESTClient, company_number: str
 ) -> Iterator[dict]:
-    """Every PSC registered against a company, current and ceased, tagged with its company."""
+    """Every PSC registered against a company, current and ceased, tagged with its company.
+
+    The etag is dropped: Companies House changes it without any visible change to the PSC, which
+    would open a meaningless SCD2 version."""
     path = PSC_PATH.format(company_number=company_number)
     hooks = {"response": [wait_for_rate_limit, skip_not_found]}
     for page in client.paginate(path, hooks=hooks):
         for item in page:
-            yield {**item, "company_number": company_number}
+            yield {
+                **{k: v for k, v in item.items() if k != "etag"},
+                "company_number": company_number,
+            }
+
+
+def company_version(company: dict) -> str:
+    """Fingerprint of a company's attributes, to tell when they change between runs."""
+    return hashlib.sha256(json.dumps(company, sort_keys=True, default=str).encode()).hexdigest()[
+        :16
+    ]
+
+
+def psc_fetch_due(last_fetch: dict | None, version: str, now: datetime, refresh_days: int) -> bool:
+    """Whether to (re)fetch a company's PSCs: it is new, its attributes changed since the last
+    fetch, or that fetch is older than the refresh window (0 = every run)."""
+    if last_fetch is None or last_fetch["version"] != version:
+        return True
+    return now - datetime.fromisoformat(last_fetch["fetched_at"]) >= timedelta(days=refresh_days)
 
 
 @dlt.source(name="companies_house", max_table_nesting=0)  # nested objects land as JSON
@@ -100,12 +123,14 @@ def companies_house(
     search_terms: Sequence[str] = dlt.config.value,
     api_key: str = dlt.secrets.value,
     base_url: str = BASE_URL,
+    psc_refresh_days: int = 7,
 ):
     client = make_client(api_key, base_url)
+    started_at = datetime.now(UTC)
 
-    # Every run is a full extract. Search snapshots are appended; companies and PSCs are SCD2, so
-    # dlt opens a new version when a record changes and closes the old one, or closes it when the
-    # record is no longer returned.
+    # Searches are a full extract every run (the API has no "changed since" filter) and are
+    # appended as snapshots. Companies and PSCs are SCD2: dlt opens a new version when a record
+    # changes and closes the old one, or closes it when the record is no longer returned.
     scd2 = {"disposition": "merge", "strategy": "scd2"}
 
     @dlt.resource(write_disposition="append")
@@ -155,8 +180,18 @@ def companies_house(
         },
     }
 
-    @dlt.transformer(data_from=companies, write_disposition=scd2, columns=psc_columns)
+    # PSCs are extracted incrementally, one request per company that is due (see psc_fetch_due).
+    # Each company's last fetch lives in dlt's resource state, saved with the load. merge_key
+    # limits SCD2 to the companies fetched this run, so PSCs of the others stay open.
+    @dlt.transformer(
+        data_from=companies, write_disposition=scd2, merge_key="company_number", columns=psc_columns
+    )
     def persons_with_significant_control(company: dict) -> Iterator[dict]:
-        yield from list_persons_with_significant_control(client, company["company_number"])
+        last_fetches = dlt.current.resource_state().setdefault("last_fetches", {})
+        number, version = company["company_number"], company_version(company)
+        if not psc_fetch_due(last_fetches.get(number), version, started_at, psc_refresh_days):
+            return
+        yield from list_persons_with_significant_control(client, number)
+        last_fetches[number] = {"version": version, "fetched_at": started_at.isoformat()}
 
     return company_searches, company_search_results, companies, persons_with_significant_control

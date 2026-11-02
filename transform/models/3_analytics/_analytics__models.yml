@@ -22,6 +22,28 @@ models:
       - name: first_limited_partnership_incorporated_on
         description: Q4.
 
+  - name: search_persons_with_significant_control
+    description: >
+      PSCs of the companies each search term returned in the latest run, current versions,
+      including ceased ones (is_ceased). Grain is search term x PSC.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "search_term || '|' || psc_id"
+
+  - name: search_companies_with_pscs
+    description: >
+      search_companies with each company's latest PSC (the most recently notified with control,
+      else the most recently notified overall), for the dashboard's Explore Dataset table. Grain is
+      search term x company; companies with no PSC record have empty PSC columns.
+    data_tests:
+      - unique:
+          arguments:
+            column_name: "search_term || '|' || company_number"
+    columns:
+      - name: company_number
+        data_tests: [not_null]
+
   - name: search_premises_by_company_type
     description: Q6. Sum of premises numbers per company type. Grain is search term x company type.
     data_tests:

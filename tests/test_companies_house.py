@@ -1,4 +1,5 @@
 import base64
+from datetime import UTC, datetime
 
 import pytest
 from requests import HTTPError
@@ -9,6 +10,7 @@ from ingestion.companies_house import (
     count_companies,
     list_persons_with_significant_control,
     make_client,
+    psc_fetch_due,
     search_companies,
 )
 from tests.conftest import fake_company
@@ -102,6 +104,7 @@ def test_lists_pscs_tagged_with_their_company(client, requests_mock, psc_fixture
 
     assert [p["name"] for p in pscs] == ["Ms Jane Example", "Example Holdings Limited"]
     assert {p["company_number"] for p in pscs} == {"00000001"}
+    assert not any("etag" in p for p in pscs)  # changes on its own; would churn SCD2 versions
     assert requests_mock.last_request.qs["items_per_page"] == ["100"]
 
 
@@ -131,3 +134,20 @@ def test_waits_for_the_rate_limit_window_when_quota_runs_low(
     list(list_persons_with_significant_control(client, "00000001"))
 
     assert sleeps == ([61] if expect_wait else [])
+
+
+NOW = datetime(2026, 11, 8, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("last_fetch", "refresh_days", "due"),
+    [
+        (None, 7, True),  # new company
+        ({"version": "old", "fetched_at": "2026-11-07T00:00:00+00:00"}, 7, True),  # changed
+        ({"version": "v1", "fetched_at": "2026-11-07T00:00:00+00:00"}, 7, False),  # fresh
+        ({"version": "v1", "fetched_at": "2026-11-01T00:00:00+00:00"}, 7, True),  # stale
+        ({"version": "v1", "fetched_at": "2026-11-08T00:00:00+00:00"}, 0, True),  # full refresh
+    ],
+)
+def test_psc_fetch_due(last_fetch, refresh_days, due):
+    assert psc_fetch_due(last_fetch, "v1", NOW, refresh_days) is due
