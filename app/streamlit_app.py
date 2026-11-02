@@ -124,7 +124,7 @@ card_grid(
             f"{s.results_fetched:,} fetched from the API",
         ),
         scorecard(
-            "Q2 - Of those, how many active",
+            "Q2 - Of those, how many companies are active",
             f"{s.active_companies:,}",
             f"{active_share:.0%} of the {s.results_fetched:,} fetched",
         ),
@@ -137,7 +137,7 @@ card_grid(
             f"across {s.dissolved_companies:,} dissolved companies",
         ),
         scorecard(
-            "Q4 - First Limited-Partnership of cohort",
+            "Q4 - The first Limited-Partnership of this cohort",
             "–" if pd.isna(first_lp) else f"{first_lp:%d %b %Y}",
             "No limited partnerships"
             if pd.isna(first_lp)
