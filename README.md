@@ -38,13 +38,12 @@ Prerequisites are [uv](https://docs.astral.sh/uv/) and a free
 
 ```bash
 make install
-touch .env                  # add your API key (see below)
-make run                    # ingest -> dbt build
-make app                    # answers dashboard at http://localhost:8501
+touch .env                  # add your Companies House API key
+make run                    # ingests data from api -> transforms via dbt
+make app                    # answers questions via a streamlit dashboard at http://localhost:8501
 ```
 
-`.env` should contain the following, with no quotes around the values (the Makefile passes them
-through literally):
+`.env` should contain the following, with no quotes around the values:
 
 ```
 SOURCES__COMPANIES_HOUSE__API_KEY=your-key-here
